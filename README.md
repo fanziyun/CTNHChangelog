@@ -73,4 +73,6 @@ The configuration file is located at `config/ctnhchangelog-client.toml`.
 | `changes` | Array | 是 | 变更明细列表，每项为单条文本 |
 
 
+
 Example: [changelog.json](src/main/resources/changelog.json)
+A Useful Tool [changelog.html](deepseek_ctnhchangelog.html)
