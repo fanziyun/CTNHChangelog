@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CTNH 更新日志配置工具</title>
-    <!-- 主要使用 Cloudflare CDN，备用使用 cdnjs -->
+    <!-- SortableJS 拖拽库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <!-- 如果上面失败，下面这行会尝试加载（但浏览器通常会缓存，为防止阻塞可以加一个fallback检查） -->
     <script>window.Sortable || document.write('<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"><\/script>');</script>
     <style>
         * {
@@ -447,7 +446,7 @@
         }
 
         .tag {
-            color: #ffffff; /* 白色文字保证可读性 */
+            color: #ffffff;
             padding: 4px 10px 4px 6px;
             border-radius: 16px;
             font-size: 12px;
@@ -659,6 +658,7 @@
 
     <script>
         const TYPE_OPTIONS = ['major', 'minor', 'patch', 'hotfix', 'danger'];
+        // 显示名称：重大更新、功能更新
         const TYPE_DISPLAY_NAMES = {
             'major': '重大更新',
             'minor': '功能更新',
@@ -690,7 +690,7 @@
                 }
             ],
             tagColors: {
-                "Example": "0xFF5555FF" // 修改为 0x 格式 (蓝色)
+                "Example": "0xFF5555FF"
             }
         };
 
@@ -699,7 +699,6 @@
         let isTocExpanded = true;
         let sortableInstances = [];
 
-        // 等待 Sortable 加载完成（最多尝试 20 次，间隔 100ms）
         function waitForSortable(callback, maxAttempts = 20) {
             let attempts = 0;
             function check() {
@@ -709,7 +708,7 @@
                     attempts++;
                     setTimeout(check, 100);
                 } else {
-                    console.error('Sortable library failed to load. Drag and drop will not work.');
+                    console.error('Sortable library failed to load.');
                     showToast('拖拽库加载失败，请刷新页面重试', 'error');
                 }
             }
@@ -774,12 +773,7 @@
         }
 
         function initDragSort() {
-            // 确保 Sortable 可用
-            if (typeof Sortable === 'undefined') {
-                console.warn('Sortable not available, skipping drag init');
-                return;
-            }
-            // 销毁旧实例
+            if (typeof Sortable === 'undefined') return;
             sortableInstances.forEach(instance => instance.destroy());
             sortableInstances = [];
 
@@ -831,12 +825,9 @@
                 const entryDiv = document.createElement('div');
                 entryDiv.className = 'entry-card';
                 entryDiv.id = `entry-${index}`;
-                // 生成标签HTML，每个标签使用对应颜色背景
                 const tagsHtml = entry.tags.map(tag => {
-                    // 获取标签颜色，如果未定义则使用默认灰色 0xFF888888
                     let tagColor = currentData.tagColors[tag] || '0xFF888888';
-                    // 转换为 #RRGGBB 用于 CSS 背景
-                    const bgColor = hexToRgba(tagColor); // 该函数已支持 0x 转 #
+                    const bgColor = hexToRgba(tagColor);
                     return `
                         <span class="tag" style="background: ${bgColor}">
                             <span class="drag-handle">☰</span>
@@ -920,7 +911,6 @@
                 `;
                 container.appendChild(entryDiv);
             });
-            // 等待 Sortable 可用后初始化拖拽
             waitForSortable(initDragSort);
             renderToc();
         }
@@ -929,14 +919,11 @@
             const container = document.getElementById('tagColorsContainer');
             container.innerHTML = '';
             Object.entries(currentData.tagColors).forEach(([tag, color]) => {
-                // 确保 color 是 0x 格式（如果是 # 开头则转换）
                 let displayColor = color;
                 if (color.startsWith('#')) {
-                    // 将 #RRGGBB 转为 0xFFRRGGBB
                     displayColor = '0xFF' + color.substring(1);
                 }
-                // 对于显示，我们希望文本框显示 0x 格式，颜色选择器使用 # 格式
-                const hexColor = argbToHex(displayColor); // 转为 #RRGGBB 供颜色选择器使用
+                const hexColor = argbToHex(displayColor);
                 const row = document.createElement('div');
                 row.style.display = 'flex';
                 row.style.gap = '8px';
@@ -998,16 +985,19 @@
         function updateEntryTypes(index, type, checked) {
             const entry = currentData.entries[index];
             if (checked) {
-                if (!entry.type.includes(type)) entry.type.push(type);
+                if (!entry.type.includes(type)) {
+                    entry.type.push(type);
+                }
             } else {
                 entry.type = entry.type.filter(t => t !== type);
             }
-            renderEntries(); // 重新渲染以更新类型标签显示
+            // 按固定顺序重新排序
+            entry.type = TYPE_OPTIONS.filter(t => entry.type.includes(t));
+            renderEntries();
             updatePreview();
         }
 
         function updateEntryColor(index, hexColor) {
-            // hexColor 是 #RRGGBB 格式，转换为 0xFFRRGGBB
             const rgb = hexColor.replace('#', '');
             currentData.entries[index].color = `0xFF${rgb}`;
             renderEntries();
@@ -1050,7 +1040,7 @@
 
         function addTagColor() {
             const newTag = `新标签${Object.keys(currentData.tagColors).length + 1}`;
-            currentData.tagColors[newTag] = "0xFF888888"; // 默认灰色
+            currentData.tagColors[newTag] = "0xFF888888";
             renderTagColors();
             updatePreview();
         }
@@ -1066,20 +1056,15 @@
         }
 
         function updateTagColor(tag, color, isHexInput) {
-            // isHexInput true 表示来自颜色选择器，传入的是 #RRGGBB
-            // false 表示来自文本框，传入的可能已经是 0x 格式，也可能是 # 格式
             let newColor;
             if (isHexInput) {
-                // #RRGGBB -> 0xFFRRGGBB
                 newColor = '0xFF' + color.substring(1);
             } else {
-                // 文本框输入，可能是 0x 或 # 格式，统一转为 0x
                 if (color.startsWith('#')) {
                     newColor = '0xFF' + color.substring(1);
                 } else if (color.startsWith('0x')) {
-                    newColor = color; // 保持原样
+                    newColor = color;
                 } else {
-                    // 未知格式，尝试作为数字？直接保存但可能无效，我们默认加上 0xFF
                     newColor = '0xFF' + color.replace(/^#/, '');
                 }
             }
@@ -1104,19 +1089,16 @@
             updatePreview();
         });
 
-        // 辅助函数：将 0xFFRRGGBB 或 #RRGGBB 转换为 #RRGGBB 供颜色选择器使用
         function argbToHex(argb) {
             if (argb && argb.startsWith('0x')) {
-                // 0xFFRRGGBB -> #RRGGBB
                 return '#' + argb.substring(4);
             }
             if (argb && argb.startsWith('#')) {
-                return argb; // 已经是 # 格式
+                return argb;
             }
-            return '#FFFF00'; // 默认
+            return '#FFFF00';
         }
 
-        // 辅助函数：将 0x 或 # 格式转为 #RRGGBB 用于 CSS 背景
         function hexToRgba(hex) {
             if (hex && hex.startsWith('0x')) {
                 return '#' + hex.substring(4);
@@ -1154,9 +1136,7 @@
                         const imported = JSON.parse(e.target.result);
                         if (imported.footer !== undefined && imported.entries) {
                             currentData = imported;
-                            // 确保 tagColors 存在，并统一格式为 0x
                             if (!currentData.tagColors) currentData.tagColors = {};
-                            // 将可能存在的 # 格式转换为 0x 格式
                             Object.keys(currentData.tagColors).forEach(tag => {
                                 const col = currentData.tagColors[tag];
                                 if (typeof col === 'string' && col.startsWith('#')) {
@@ -1201,7 +1181,6 @@
             }, 3000);
         }
 
-        // 启动初始化
         init();
     </script>
 </body>
