@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CTNH 更新日志配置工具</title>
+    <!-- SortableJS 轻量拖拽库 -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -380,31 +382,44 @@
             color: #ff5555;
         }
 
+        /* 标签容器 */
         .tags-container {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin: 12px 0;
+            min-height: 30px; /* 保证拖拽区域可见 */
         }
 
         .tag {
             background: #2d3349;
             color: #e0e0e0;
-            padding: 4px 10px;
+            padding: 4px 10px 4px 6px;
             border-radius: 16px;
             font-size: 12px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            border: 1px solid #404760;
+            user-select: none;
         }
 
-        .tag-color {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
+        .drag-handle {
+            cursor: grab;
+            opacity: 0.5;
+            font-size: 14px;
+            margin-right: 2px;
+            user-select: none;
         }
-
+        .drag-handle:hover {
+            opacity: 1;
+        }
+        .tag-name {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .remove-tag {
             background: none;
             border: none;
@@ -413,62 +428,11 @@
             font-size: 12px;
             padding: 0 2px;
         }
-
         .remove-tag:hover {
             color: #ff5555;
         }
 
-        .type-checkbox-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin: 8px 0;
-        }
-
-        .type-checkbox-item {
-            display: flex;
-            align-items: center;
-        }
-
-        .type-checkbox-item input[type="checkbox"] {
-            display: none;
-        }
-
-        .type-checkbox-item label {
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-            background: #2d3349;
-            color: #a0a0a0;
-        }
-
-        .type-checkbox-item input[type="checkbox"]:checked + label {
-            background: #ffaa00;
-            color: #1a1e2b;
-            border-color: #ffffff;
-            box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
-        }
-
-        .type-major label { background: #5555FF20; color: #aaaaff; }
-        .type-major input[type="checkbox"]:checked + label { background: #5555FF; color: white; }
-
-        .type-minor label { background: #55FF5520; color: #aaffaa; }
-        .type-minor input[type="checkbox"]:checked + label { background: #55FF55; color: #1a1e2b; }
-
-        .type-patch label { background: #FFFF5520; color: #ffffaa; }
-        .type-patch input[type="checkbox"]:checked + label { background: #FFFF55; color: #1a1e2b; }
-
-        .type-hotfix label { background: #FF555520; color: #ffaaaa; }
-        .type-hotfix input[type="checkbox"]:checked + label { background: #FF5555; color: white; }
-
-        .type-danger label { background: #FF555520; color: #ffaaaa; }
-        .type-danger input[type="checkbox"]:checked + label { background: #FF0000; color: white; }
-
+        /* 变更列表 */
         .changes-list {
             list-style: none;
             margin: 12px 0;
@@ -476,14 +440,21 @@
 
         .change-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: 8px;
             padding: 6px 0;
             border-bottom: 1px solid #2d3349;
+            background: #1a1e2b;
         }
 
-        .change-item:last-child {
-            border-bottom: none;
+        .change-item .drag-handle {
+            cursor: grab;
+            opacity: 0.5;
+            font-size: 16px;
+            margin-left: 4px;
+        }
+        .change-item .drag-handle:hover {
+            opacity: 1;
         }
 
         .change-item input {
@@ -502,6 +473,7 @@
             color: #ff5555;
             cursor: pointer;
             font-size: 14px;
+            margin-right: 4px;
         }
 
         .add-change-btn {
@@ -565,14 +537,6 @@
                 transform: translateX(0);
                 opacity: 1;
             }
-        }
-
-        .tag-color-preview {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 4px;
-            margin-right: 4px;
         }
 
         button:disabled {
@@ -688,6 +652,8 @@
         let currentData = JSON.parse(JSON.stringify(defaultData));
         let currentTab = 'entries';
         let isTocExpanded = true;
+        // 存储所有 Sortable 实例，便于销毁
+        let sortableInstances = [];
 
         function init() {
             renderEntries();
@@ -744,6 +710,59 @@
             if (entries[index]) {
                 entries[index].scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+        }
+
+        // 初始化所有可拖拽容器 (标签和变更)
+        function initDragSort() {
+            // 销毁之前的 Sortable 实例
+            sortableInstances.forEach(instance => instance.destroy());
+            sortableInstances = [];
+
+            // 为每个条目的标签容器和变更容器创建 Sortable
+            document.querySelectorAll('[id^="tags-"]').forEach(container => {
+                if (container.children.length === 0) return; // 空容器跳过
+                const sortable = new Sortable(container, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    onEnd: function(evt) {
+                        // 获取条目索引
+                        const id = evt.target.id; // 例如 "tags-0"
+                        const index = parseInt(id.split('-')[1]);
+                        // 重建 tags 数组
+                        const newTags = [];
+                        const tagElements = container.querySelectorAll('.tag');
+                        tagElements.forEach(tagEl => {
+                            const nameSpan = tagEl.querySelector('.tag-name');
+                            if (nameSpan) newTags.push(nameSpan.textContent);
+                        });
+                        currentData.entries[index].tags = newTags;
+                        updatePreview();
+                    }
+                });
+                sortableInstances.push(sortable);
+            });
+
+            document.querySelectorAll('[id^="changes-"]').forEach(container => {
+                if (container.children.length === 0) return;
+                const sortable = new Sortable(container, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    onEnd: function(evt) {
+                        const id = evt.target.id; // 例如 "changes-0"
+                        const index = parseInt(id.split('-')[1]);
+                        // 重建 changes 数组
+                        const newChanges = [];
+                        const changeItems = container.querySelectorAll('.change-item');
+                        changeItems.forEach(item => {
+                            const input = item.querySelector('input');
+                            if (input) newChanges.push(input.value);
+                        });
+                        currentData.entries[index].changes = newChanges;
+                        updatePreview();
+                    }
+                });
+                sortableInstances.push(sortable);
+            });
         }
 
         function renderEntries() {
@@ -804,19 +823,16 @@
                     <div class="form-group">
                         <label>标签</label>
                         <div class="tags-container" id="tags-${index}">
-                            ${entry.tags.map(tag => {
-                                const tagColor = currentData.tagColors[tag] || '0xFF888888';
-                                return `
-                                    <span class="tag">
-                                        <span class="tag-color" style="background: ${hexToRgba(tagColor)}"></span>
-                                        ${tag}
-                                        <button class="remove-tag" onclick="removeTagFromEntry(${index}, '${tag}')">✕</button>
-                                    </span>
-                                `;
-                            }).join('')}
+                            ${entry.tags.map(tag => `
+                                <span class="tag">
+                                    <span class="drag-handle">☰</span>
+                                    <span class="tag-name">${tag}</span>
+                                    <button class="remove-tag" onclick="removeTagFromEntry(${index}, '${tag}')">✕</button>
+                                </span>
+                            `).join('')}
                         </div>
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
-                            <input type="text" class="form-control" id="newTag-${index}" placeholder="新标签" style="width: 200px;" list="tag-suggestions">
+                            <input type="text" class="form-control" id="newTag-${index}" placeholder="新标签" style="width: 200px;">
                             <button class="btn" onclick="addTagToEntry(${index})">添加</button>
                         </div>
                     </div>
@@ -825,6 +841,7 @@
                         <div class="changes-list" id="changes-${index}">
                             ${entry.changes.map((change, changeIndex) => `
                                 <div class="change-item">
+                                    <span class="drag-handle">☰</span>
                                     <input type="text" value="${change.replace(/"/g, '&quot;')}" onchange="updateChange(${index}, ${changeIndex}, this.value)">
                                     <button onclick="deleteChange(${index}, ${changeIndex})">✕</button>
                                 </div>
@@ -835,6 +852,8 @@
                 `;
                 container.appendChild(entryDiv);
             });
+            // 渲染完成后初始化拖拽排序
+            initDragSort();
             renderToc();
         }
 
@@ -868,12 +887,10 @@
                 color: "0xFFFFFF00",
                 changes: ["Example"]
             };
-            // 将新条目添加到数组最前面（最新版本在上）
             currentData.entries.unshift(newEntry);
             renderEntries();
             updatePreview();
             showToast('新增条目成功');
-            // 滚动到新条目（索引0，即最顶端）
             setTimeout(() => navigateToVersion(0), 100);
         }
 
@@ -909,7 +926,7 @@
             } else {
                 entry.type = entry.type.filter(t => t !== type);
             }
-            renderEntries();
+            renderEntries(); // 重新渲染以更新类型标签显示
             updatePreview();
         }
 
@@ -923,7 +940,8 @@
         function addTagToEntry(entryIndex) {
             const input = document.getElementById(`newTag-${entryIndex}`);
             const newTag = input.value.trim();
-            if (newTag && !currentData.entries[entryIndex].tags.includes(newTag)) {
+            if (newTag) {
+                // 直接推入，允许重复
                 currentData.entries[entryIndex].tags.push(newTag);
                 renderEntries();
                 updatePreview();
@@ -966,7 +984,7 @@
                 currentData.tagColors[newTag.trim()] = currentData.tagColors[oldTag];
                 delete currentData.tagColors[oldTag];
                 renderTagColors();
-                renderEntries();
+                renderEntries(); // 重新渲染条目以更新标签显示
                 updatePreview();
             }
         }
