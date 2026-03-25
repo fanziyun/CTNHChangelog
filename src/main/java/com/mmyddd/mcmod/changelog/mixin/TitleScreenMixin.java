@@ -1,16 +1,16 @@
 package com.mmyddd.mcmod.changelog.mixin;
 
-import com.mmyddd.mcmod.changelog.Config;
 import com.mmyddd.mcmod.changelog.client.ChangelogEntry;
 import com.mmyddd.mcmod.changelog.client.ChangelogOverviewScreen;
+import com.mmyddd.mcmod.changelog.client.Config;
 import com.mmyddd.mcmod.changelog.client.VersionCheckService;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,24 +21,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TitleScreenMixin extends Screen {
 
     @Unique
-    private Button ctnhChangelogButton;
+    private ButtonWidget ctnhChangelogButton;
 
     @Unique
     private boolean ctnhHasUpdate = false;
 
     @Unique
-    private static final int BLINK_INTERVAL = 800; // 800ms 闪烁周期，与Forge一致
+    private static final int BLINK_INTERVAL = 800;
 
     @Unique
-    private static final ResourceLocation VERSION_CHECK_ICONS =
-            ResourceLocation.tryBuild("forge", "textures/gui/version_check_icons.png");
+    private static final Identifier VERSION_CHECK_ICONS =
+            Identifier.of("minecraft", "textures/gui/sprites/hud/heart/container.png"); // 建议换成你自己的资源路径
 
-    protected TitleScreenMixin(Component title) {
+    protected TitleScreenMixin(Text title) {
         super(title);
     }
 
     @Inject(method = "init", at = @At("HEAD"))
     private void onInitHead(CallbackInfo ci) {
+        // 确保 Config 类里有这些静态方法
         if (Config.isChangelogTabEnabled() && !Config.getModpackVersion().isEmpty()) {
             VersionCheckService.reset();
             VersionCheckService.checkForUpdate();
@@ -51,26 +52,26 @@ public abstract class TitleScreenMixin extends Screen {
         if (!Config.showButtonOnTitleScreen()) return;
 
         int l = this.height / 4 + 48;
-        int buttonY = l + 72 + 12 + 24; // options按钮下方24像素
+        int buttonY = l + 72 + 12 + 24;
 
-        ctnhChangelogButton = Button.builder(
-                Component.translatable("ctnhchangelog.button.changelog"),
+        // Fabric 1.21.1 使用 ButtonWidget.builder
+        this.ctnhChangelogButton = ButtonWidget.builder(
+                Text.translatable("ctnhchangelog.button.changelog"),
                 button -> {
                     ChangelogEntry.resetLoaded();
                     ChangelogEntry.loadAfterConfig();
-                    Minecraft.getInstance().setScreen(
-                            new ChangelogOverviewScreen((TitleScreen) (Object) this)
+                    MinecraftClient.getInstance().setScreen(
+                            new ChangelogOverviewScreen(this)
                     );
                 }
-        ).bounds(this.width / 2 - 100, buttonY, 200, 20).build();
+        ).dimensions(this.width / 2 - 100, buttonY, 200, 20).build();
 
-        addRenderableWidget(ctnhChangelogButton);
+        this.addDrawableChild(ctnhChangelogButton);
     }
 
     @Override
     public void tick() {
         super.tick();
-
         if (Config.isEnableVersionCheck() && VersionCheckService.isCheckDone()) {
             ctnhHasUpdate = VersionCheckService.hasUpdate();
         } else {
@@ -79,7 +80,7 @@ public abstract class TitleScreenMixin extends Screen {
     }
 
     @Inject(method = "render", at = @At("TAIL"))
-    private void onRender(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!ctnhHasUpdate || ctnhChangelogButton == null) return;
 
         int x = ctnhChangelogButton.getX();
@@ -87,15 +88,15 @@ public abstract class TitleScreenMixin extends Screen {
         int w = ctnhChangelogButton.getWidth();
         int h = ctnhChangelogButton.getHeight();
 
-        int iconX = x + w - (h / 2 + 4);
+        int iconX = x + w - 15;
         int iconY = y + (h / 2 - 4);
 
-        int sheetOffset = 3;
-        int u = sheetOffset * 8;
-
         boolean blink = (System.currentTimeMillis() / BLINK_INTERVAL & 1) == 1;
-        int v = blink ? 8 : 0;
 
-        graphics.blit(VERSION_CHECK_ICONS, iconX, iconY, u, v, 8, 8, 64, 16);
+        // 1.21.1 绘制纹理建议使用 DrawContext.drawTexture
+        if (blink) {
+            // 参数依次为: 纹理标识符, x, y, u, v, width, height, textureWidth, textureHeight
+            context.drawTexture(VERSION_CHECK_ICONS, iconX, iconY, 0, 0, 8, 8, 8, 8);
+        }
     }
 }

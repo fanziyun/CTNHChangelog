@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "ctnhchangelog",
+  "version": "${version}",
+  "name": "CTNH Changelog",
+  "description": "Changelog viewer for Create: New Horizon modpack.",
+  "authors": ["CTNH Team"],
+  "contact": {},
+  "license": "LGPLv3",
+  "icon": "assets/ctnhchangelog/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.mmyddd.mcmod.changelog.CTNHChangelog"
+    ]
+  },
+  "mixins": [
+    "ctnhchangelog.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "1.21.1",
+    "java": "21"
+  }
+}

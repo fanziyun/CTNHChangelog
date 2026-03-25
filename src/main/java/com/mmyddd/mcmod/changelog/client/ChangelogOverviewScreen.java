@@ -1,213 +1,79 @@
 package com.mmyddd.mcmod.changelog.client;
 
-import com.mmyddd.mcmod.changelog.Config;
-import lombok.Getter;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 public class ChangelogOverviewScreen extends Screen {
-    private final Screen parentScreen;
-    private ChangelogList changelogList;
-    private int listTop;
-    private int listBottom;
-    @Getter
-    private int listLeft;
-    @Getter
-    private int listRight;
-    private boolean isLoading = false;
+    private final Screen parent;
+    private ChangelogList list;
+    private boolean listInitialized = false;
 
     public ChangelogOverviewScreen(Screen parent) {
-        super(Component.translatable("ctnhchangelog.tab.title"));
-        this.parentScreen = parent;
+        super(Text.literal("整合包更新日志"));
+        this.parent = parent;
     }
 
     @Override
     protected void init() {
-        super.init();
-
-        this.listLeft = 20;
-        this.listRight = this.width - 20;
-        this.listTop = 40;
-        this.listBottom = this.height - 60;
-
-        refreshList();
-
-        this.addRenderableWidget(
-                Button.builder(
-                                Component.translatable("gui.back"),
-                                button -> this.minecraft.setScreen(parentScreen)
-                        )
-                        .bounds(this.width / 2 - 50, this.height - 30, 100, 20)
-                        .build()
-        );
-        this.addRenderableWidget(
-                Button.builder(
-                                Component.literal("↻"),
-                                button -> {
-                                    if (!isLoading) {
-                                        isLoading = true;
-                                        button.active = false;
-
-                                        ChangelogEntry.resetLoaded();
-
-                                        CompletableFuture.runAsync(() -> {
-                                            ChangelogEntry.loadAfterConfig();
-                                            while (!ChangelogEntry.isLoadingComplete()) {
-                                                try {
-                                                    Thread.sleep(50);
-                                                } catch (InterruptedException e) {
-                                                    Thread.currentThread().interrupt();
-                                                    break;
-                                                }
-                                            }
-
-                                            if (this.minecraft != null) {
-                                                this.minecraft.execute(() -> {
-                                                    refreshList();
-                                                    isLoading = false;
-                                                    button.active = true;
-                                                });
-                                            }
-                                        });
-                                    }
-                                }
-                        )
-                        .bounds(this.width - 30, 10, 20, 20)
-                        .build()
-        );
-    }
-
-    private void refreshList() {
-        if (changelogList != null) {
-            this.removeWidget(changelogList);
-        }
-        this.changelogList = new ChangelogList(
-                this.minecraft,
-                this.width - 40,
-                this.height - 100,
-                this.listTop,
-                this.listBottom,
-                52
-        );
-        this.addRenderableWidget(changelogList);
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(graphics);
-
-        String title = this.title.getString();
-        graphics.drawString(
-                this.font,
-                title,
-                this.width / 2 - this.font.width(title) / 2,
-                20,
-                0xFFFFFF
-        );
-
-        List<ChangelogEntry> entries = ChangelogEntry.getAllEntries();
-        String stats = Component.translatable(
-                "ctnhchangelog.stats",
-                entries.size()
-        ).getString();
-
-        if (isLoading) {
-            stats = Component.translatable("ctnhchangelog.loading").getString() + " " + stats;
-        }
-
-        graphics.drawString(
-                this.font,
-                stats,
-                20,
-                25,
-                0xAAAAAA
-        );
-
-        if (Config.isEnableVersionCheck() && VersionCheckService.isCheckDone() && VersionCheckService.hasUpdate()) {
-            String currentVersion = Config.getModpackVersion();
-            String latestVersion = VersionCheckService.getLatestChangelogVersion();
-
-            String updateText = Component.translatable(
-                    "ctnhchangelog.update_available",
-                    currentVersion,
-                    latestVersion
-            ).getString();
-
-            int statsWidth = this.font.width(stats);
-            int x = 20 + statsWidth + 4;
-
-            graphics.drawString(
-                    this.font,
-                    updateText,
-                    x,
-                    25,
-                    0xFFFF55
-            );
-        }
-
-        String footer = ChangelogEntry.getFooterText();
-        if (footer != null && !footer.isEmpty()) {
-            int footerY = this.height - 50;
-            int textWidth = this.font.width(footer);
-            int startX = (this.width - textWidth) / 2;
-            int charX = startX;
-
-            for (int i = 0; i < footer.length(); i++) {
-                String ch = String.valueOf(footer.charAt(i));
-                float progress = (float) i / (float) (footer.length() - 1);
-                int color = getGradientColor(progress);
-                graphics.drawString(this.font, ch, charX, footerY, color);
-                charX += this.font.width(ch);
+        // 1. 刷新按钮 (↻)
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("↻").formatted(Formatting.BOLD), button -> {
+            ChangelogEntry.resetLoaded();
+            this.listInitialized = false;
+            // 异步加载并重启 Screen
+            ChangelogEntry.loadAfterConfig().thenRun(() -> {
+                if (this.client != null) {
+                    this.client.execute(this::clearAndInit);
+                }
+            });
+            if (this.client != null) {
+                this.client.getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.master(
+                        net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1.2F));
             }
-        }
+        }).dimensions(this.width - 30, 10, 20, 20).build());
 
-        super.render(graphics, mouseX, mouseY, partialTick);
+        // 2. 返回按钮
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.back"), button -> this.close())
+                .dimensions(this.width / 2 - 100, this.height - 30, 200, 20).build());
+
+        // 3. 核心逻辑：只要数据好了，立刻创建 UI
+        if (ChangelogEntry.isLoaded()) {
+            this.createList();
+        } else if (!ChangelogEntry.isLoading()) {
+            ChangelogEntry.loadAfterConfig();
+        }
     }
 
-    private int getGradientColor(float progress) {
-        int startR = 85, startG = 255, startB = 85;
-        int midR = 0, midG = 255, midB = 136;
-        int endR = 0, endG = 170, endB = 204;
-
-        int r, g, b;
-        if (progress < 0.5F) {
-            float t = progress * 2.0F;
-            r = (int) (startR + (midR - startR) * t);
-            g = (int) (startG + (midG - startG) * t);
-            b = (int) (startB + (midB - startB) * t);
-        } else {
-            float t = (progress - 0.5F) * 2.0F;
-            r = (int) (midR + (endR - midR) * t);
-            g = (int) (midG + (endG - midG) * t);
-            b = (int) (midB + (endB - midB) * t);
-        }
-        return 0xFF000000 | r << 16 | g << 8 | b;
+    private void createList() {
+        // 修复：直接重新赋值并添加，不再调用找不到的 removeInternal
+        this.list = new ChangelogList(this.client, this.width, this.height, 40, 40, this);
+        this.addDrawableChild(this.list);
+        this.listInitialized = true;
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (changelogList != null && changelogList.mouseClicked(mouseX, mouseY, button)) {
-            return true;
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        this.renderBackground(context, mouseX, mouseY, delta);
+
+        // 如果在渲染期间数据才加载完，补全 UI
+        if (ChangelogEntry.isLoaded() && !listInitialized) {
+            this.createList();
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+
+        super.render(context, mouseX, mouseY, delta);
+
+        if (ChangelogEntry.isLoading()) {
+            context.drawCenteredTextWithShadow(this.textRenderer, "正在从服务器获取最新内容...", this.width / 2, this.height / 2, 0xFFFFAA00);
+        }
+
+        context.drawCenteredTextWithShadow(this.textRenderer, this.getTitle(), this.width / 2, 15, 0xFFFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(ChangelogEntry.getFooterText()), this.width / 2, this.height - 45, 0xAAAAAA);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (changelogList != null && changelogList.mouseScrolled(mouseX, mouseY, delta)) {
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+    public void close() {
+        if (this.client != null) this.client.setScreen(this.parent);
     }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
-
 }
