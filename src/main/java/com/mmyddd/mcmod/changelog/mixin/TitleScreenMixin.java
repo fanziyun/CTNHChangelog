@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TitleScreenMixin extends Screen {
 
     @Unique
-    private ButtonWidget ctnhChangelogButton;
+    private ButtonWidget ctnChangelogButton;
 
     protected TitleScreenMixin(Text title) {
         super(title);
@@ -38,7 +38,7 @@ public abstract class TitleScreenMixin extends Screen {
 
         int buttonY = this.height / 4 + 48 + 72 + 12 + 24;
 
-        this.ctnhChangelogButton = ButtonWidget.builder(
+        this.ctnChangelogButton = ButtonWidget.builder(
                 Text.translatable("menu.ctnhchangelog.button"),
                 button -> {
                     ChangelogEntry.loadAfterConfig();
@@ -48,7 +48,7 @@ public abstract class TitleScreenMixin extends Screen {
                 }
         ).dimensions(this.width / 2 - 100, buttonY, 200, 20).build();
 
-        this.addDrawableChild(ctnhChangelogButton);
+        this.addDrawableChild(ctnChangelogButton);
     }
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -62,12 +62,12 @@ public abstract class TitleScreenMixin extends Screen {
             if (VersionCheckService.hasUpdate()) {
                 info.append(" §6(发现新版本: v").append(VersionCheckService.getLatestChangelogVersion()).append("!)");
 
-                if (ctnhChangelogButton != null) {
+                if (ctnChangelogButton != null) {
                     boolean blink = (System.currentTimeMillis() / 500 & 1) == 1;
                     if (blink) {
                         context.drawTextWithShadow(this.textRenderer, "!",
-                                ctnhChangelogButton.getX() + ctnhChangelogButton.getWidth() - 12,
-                                ctnhChangelogButton.getY() + 6, 0xFF5555);
+                                ctnChangelogButton.getX() + ctnChangelogButton.getWidth() - 12,
+                                ctnChangelogButton.getY() + 6, 0xFF5555);
                     }
                 }
             } else {
