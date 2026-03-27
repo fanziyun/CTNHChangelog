@@ -10,19 +10,28 @@ base {
     archivesName = "ctnhchangelog"
 }
 
+// 所有的仓库定义必须在这里面
 repositories {
     maven { url "https://maven.fabricmc.net/" }
+    maven { url "https://maven.shedaniel.me/" } // Cloth Config 仓库
+    maven { url "https://maven.terraformersmc.com/releases/" } // Mod Menu 仓库
     mavenCentral()
 }
 
 dependencies {
-    // 使用你提供的官方推荐版本
+    // 基础环境
     minecraft "com.mojang:minecraft:1.21.1"
     mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
     modImplementation "net.fabricmc:fabric-loader:0.18.4"
-
-    // Fabric API
     modImplementation "net.fabricmc.fabric-api:fabric-api:0.116.9+1.21.1"
+
+    // 配置界面 (Cloth Config)
+    modApi("me.shedaniel.cloth:cloth-config-fabric:15.0.140") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+
+    // 模组菜单 (Mod Menu)
+    modImplementation "com.terraformersmc:modmenu:11.0.1"
 }
 
 processResources {
@@ -34,15 +43,13 @@ processResources {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
-
 java {
     withSourcesJar()
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
 }
+
 tasks.withType(JavaCompile).configureEach {
-    options.encoding = "UTF-8"
+    it.options.release = 21
+    it.options.encoding = "UTF-8"
 }

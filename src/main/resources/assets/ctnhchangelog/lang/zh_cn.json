@@ -1,18 +1,14 @@
 {
-  "ctnhchangelog.tab.title": "更新日志",
-  "ctnhchangelog.button.changelog": "更新日志",
-  "ctnhchangelog.button.view_changelog": "双击查看详情",
-  "ctnhchangelog.type.major": "重大更新",
-  "ctnhchangelog.type.minor": "功能更新",
-  "ctnhchangelog.type.patch": "修复",
-  "ctnhchangelog.type.hotfix": "热修复",
-  "ctnhchangelog.type.danger": "你的存档可能损坏",
-  "ctnhchangelog.date": "日期",
-  "ctnhchangelog.version": "版本",
-  "ctnhchangelog.changes": "更改内容",
-  "ctnhchangelog.more_changes": "还有 %s 项更改...",
-  "ctnhchangelog.stats": "共 %s 个版本",
-  "ctnhchangelog.loading": "加载中...",
-  "ctnhchangelog.update_available": "发现更新! 当前版本: %s, 最新版本: %s",
-  "ctnhchangelog.screen.title": "整合包更新日志"
+  "text.autoconfig.ctnhchangelog.title": "更新日志配置",
+
+  "text.autoconfig.ctnhchangelog.option.changelogUrl": "更新日志 URL",
+  "text.autoconfig.ctnhchangelog.option.changelogUrl.@Tooltip": "指向 changelog.json 的远程链接",
+
+  "text.autoconfig.ctnhchangelog.option.modpackVersion": "当前整合包版本",
+
+  "text.autoconfig.ctnhchangelog.option.enableVersionCheck": "启用版本检查",
+
+  "text.autoconfig.ctnhchangelog.option.showOnTitle": "在主界面显示",
+
+  "text.autoconfig.ctnhchangelog.option.showOnSelectWorld": "在世界选择界面显示"
 }
