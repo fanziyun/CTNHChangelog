@@ -8,6 +8,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.mmyddd.mcmod.changelog.client.VersionCheckService;
 
 public class CTNHChangelog implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("CTNH-Changelog");
@@ -36,13 +37,15 @@ public class CTNHChangelog implements ClientModInitializer {
             LOGGER.info("[Loader] 正在启动异步更新日志下载器...");
             ChangelogEntry.initLoader();
 
-            // 根据配置决定是否触发
+            // 触发版本检查
             if (config.enableVersionCheck) {
+                VersionCheckService.checkForUpdate();
                 ChangelogEntry.loadAfterConfig();
             }
         } catch (Exception e) {
             LOGGER.error("[Loader] 初始化加载器时发生异常: ", e);
         }
+
 
         // 4. 注册主界面监听
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {

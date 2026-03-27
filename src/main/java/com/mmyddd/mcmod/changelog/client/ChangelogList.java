@@ -1,34 +1,35 @@
 package com.mmyddd.mcmod.changelog.client;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Click;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.EntryListWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSelectionList;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
 
-public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
+public class ChangelogList extends AbstractSelectionList<ChangelogList.Entry> implements ChangelogListse {
     private final Screen parentScreen;
 
-    public ChangelogList(MinecraftClient client, int width, int height, int top, int itemHeight, Screen parentScreen) {
+    public ChangelogList(Minecraft client, int width, int height, int top, int itemHeight, Screen parentScreen) {
         super(client, width, height, top, itemHeight);
         this.parentScreen = parentScreen;
 
         if (ChangelogEntry.isLoaded()) {
             for (ChangelogEntry entry : ChangelogEntry.getAllEntries()) {
-                this.addEntry(new Entry(entry));
+                this.addEntry(new com.mmyddd.mcmod.changelog.client.ChangelogList.Entry(entry));
             }
         }
     }
 
     @Override
-    public void appendClickableNarrations(NarrationMessageBuilder builder) {}
+    public void updateWidgetNarration(NarrationElementOutput builder) {}
 
-    public class Entry extends EntryListWidget.Entry<Entry> {
+    public class Entry extends AbstractSelectionList.Entry<com.mmyddd.mcmod.changelog.client.ChangelogList.Entry> implements com.mmyddd.mcmod.changelog.client.Entry {
         private final ChangelogEntry entry;
 
         public Entry(ChangelogEntry entry) {
@@ -36,12 +37,12 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
         }
 
         @Override
-        public void render(DrawContext context, int mouseX, int mouseY, boolean isSelected, float delta) {
-            MinecraftClient client = MinecraftClient.getInstance();
+        public void  renderContent(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean isSelected, float delta) {
+            Minecraft client = Minecraft.getInstance();
             int x = this.getX();
             int y = this.getY();
             int entryWidth = ChangelogList.this.getRowWidth();
-            int entryHeight = ChangelogList.this.itemHeight;
+            int entryHeight = ChangelogList.this.defaultEntryHeight;
 
             // --- 核心高亮判定逻辑 ---
             // 判断鼠标是否在当前这一行的矩形范围内
@@ -55,57 +56,62 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
             }
 
             // 1. 绘制版本号 (高亮时为青色，常态为暗青色)
-            Formatting vFormat = isHovered ? Formatting.AQUA : Formatting.DARK_AQUA;
-            Text vText = Text.literal(entry.getVersion()).formatted(vFormat, Formatting.BOLD);
-            context.drawTextWithShadow(client.textRenderer, vText, x + 5, y + 4, 0xFFFFFFFF);
+            ChatFormatting vFormat = isHovered ? ChatFormatting.AQUA : ChatFormatting.DARK_AQUA;
+            Component vText = Component.literal(entry.getVersion()).withStyle(vFormat, ChatFormatting.BOLD);
+            context.text(client.font, vText, x + 5, y + 4, 0xFFFFFFFF);
 
             // 2. 动态绘制标签 (Types + Tags)
-            int currentX = x + 5 + client.textRenderer.getWidth(vText) + 8;
+            int currentX = x + 5 + client.font.width(vText) + 8;
             List<String> allLabels = new ArrayList<>();
             if (entry.getTypes() != null) allLabels.addAll(entry.getTypes());
             if (entry.getTags() != null) allLabels.addAll(entry.getTags());
 
             for (String label : allLabels) {
                 String displayLabel = label.toUpperCase();
-                int labelWidth = client.textRenderer.getWidth(displayLabel);
+                int labelWidth = client.font.width(displayLabel);
                 int labelColor = ChangelogEntry.getTagColor(label);
 
                 // 标签背景：高亮时完全不透明，常态时带一点透明度
                 int alpha = isHovered ? 0xFF000000 : 0xAA000000;
                 context.fill(currentX - 2, y + 3, currentX + labelWidth + 2, y + 13, (labelColor & 0xFFFFFF) | alpha);
-                context.drawText(client.textRenderer, displayLabel, currentX, y + 4, 0xFFFFFFFF, false);
+                context.text(client.font, displayLabel, currentX, y + 4, 0xFFFFFFFF, false);
 
                 currentX += labelWidth + 8;
             }
 
             // 3. 绘制日期 (随悬停变色)
-            Text dText = Text.literal(entry.getDate());
-            int dateWidth = client.textRenderer.getWidth(dText);
-            context.drawTextWithShadow(client.textRenderer, dText, x + entryWidth - dateWidth - 5, y + 4, mainColor);
+            Component dText = Component.literal(entry.getDate());
+            int dateWidth = client.font.width(dText);
+            context.text(client.font, dText, x + entryWidth - dateWidth - 5, y + 4, mainColor);
 
             // 4. 绘制标题预览 (随悬停变色)
             String preview = entry.getTitle();
             if (preview == null || preview.isEmpty()) {
-                preview = !entry.getChanges().isEmpty() ? entry.getChanges().get(0) : "No description";
+                preview = !entry.getChanges().isEmpty() ? entry.getChanges().getFirst() : "No description";
             }
             if (preview.length() > 40) {
                 preview = preview.substring(0, 37) + "...";
             }
-            context.drawTextWithShadow(client.textRenderer, Text.literal(preview), x + 5, y + 18, isHovered ? 0xFFFFFFFF : 0xFF999999);
+            context.text(client.font, Component.literal(preview), x + 5, y + 18, isHovered ? 0xFFFFFFFF : 0xFF999999);
         }
 
         @Override
-        public boolean mouseClicked(Click click, boolean doubleClick) {
+        public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
             if (click.button() == 0) {
-                MinecraftClient.getInstance().getSoundManager().play(
-                        net.minecraft.client.sound.PositionedSoundInstance.master(
-                                net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1.0F
+                Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F
                         )
                 );
-                MinecraftClient.getInstance().setScreen(new ChangelogDetailScreen(this.entry, parentScreen));
+                Minecraft.getInstance().setScreen(new ChangelogDetailScreen(this.entry, parentScreen));
                 return true;
             }
             return super.mouseClicked(click, doubleClick);
+        }
+
+        @Override
+        public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a) {
+
         }
     }
 
@@ -115,15 +121,17 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
     }
 
     @Override
-    protected int getScrollbarX() {
+    protected int scrollBarX() {
         return this.width - 10;
     }
 
     @Override
-    public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderList(context, mouseX, mouseY, delta);
+    public void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        this.renderListItems(context, mouseX, mouseY, delta);
     }
 
-    @Override
-    protected void drawHeaderAndFooterSeparators(DrawContext context) {}
+    private void renderListItems(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    }
+
+
 }

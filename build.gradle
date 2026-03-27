@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.15-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version '1.16.1' // 建议用稳定版的 1.16.1
     id 'maven-publish'
 }
 
@@ -19,19 +19,18 @@ repositories {
 }
 
 dependencies {
-    // 基础环境
-    minecraft "com.mojang:minecraft:1.21.9"
-    mappings "net.fabricmc:yarn:1.21.9+build.1"
-    modImplementation "net.fabricmc:fabric-loader:0.18.5"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:0.134.1+1.21.9"
+    // 基础环境 (26.1开始去除了所有 mappings 配置)
+    minecraft "com.mojang:minecraft:26.1"
+    implementation "net.fabricmc:fabric-loader:0.19.2"
+    implementation "net.fabricmc.fabric-api:fabric-api:0.145.1+26.1"
 
-    // 配置界面 (Cloth Config)
-    modApi("me.shedaniel.cloth:cloth-config-fabric:20.0.149") {
+    // 配置界面 (Cloth Config) - 去除了 mod 前缀
+    implementation("me.shedaniel.cloth:cloth-config-fabric:26.1.154") {
         exclude(group: "net.fabricmc.fabric-api")
     }
 
-    // 模组菜单 (Mod Menu)
-    modImplementation "com.terraformersmc:modmenu:16.0.1"
+    // 模组菜单 (Mod Menu) - 去除了 mod 前缀
+    implementation "com.terraformersmc:modmenu:18.0.0-alpha.8"
 }
 
 processResources {
@@ -45,11 +44,11 @@ processResources {
 
 java {
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
+    it.options.release = 25
     it.options.encoding = "UTF-8"
 }
