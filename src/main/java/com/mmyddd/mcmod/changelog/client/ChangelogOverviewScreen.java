@@ -10,7 +10,6 @@ import net.minecraft.util.Formatting;
 
 public class ChangelogOverviewScreen extends Screen {
     private final Screen parent;
-    private ChangelogList list;
 
     public ChangelogOverviewScreen(Screen parent) {
         super(Text.translatable("menu.ctnhchangelog.title"));
@@ -35,9 +34,9 @@ public class ChangelogOverviewScreen extends Screen {
         // 3. 【核心修复 1】标准化的异步 UI 加载
         // 我们不再在 render 方法里动态创建列表，而是在 init 初始化时搞定。
         if (ChangelogEntry.isLoaded()) {
-            this.list = new ChangelogList(this.client, this.width, this.height, 40, 48, this);
+            ChangelogList list = new ChangelogList(this.client, this.width, this.height, 40, 48, this);
             // 将列表注册为可绘制组件，让 Minecraft 引擎负责它的渲染和状态隔离！
-            this.addDrawableChild(this.list);
+            this.addDrawableChild(list);
         } else if (!ChangelogEntry.isLoading()) {
             ChangelogEntry.loadAfterConfig().thenRun(() -> {
                 if (this.client != null) {
@@ -55,8 +54,6 @@ public class ChangelogOverviewScreen extends Screen {
         this.renderPanoramaBackground(context, delta);
         // 2. 开启原版模糊
         this.renderInGameBackground(context);
-        // 3. 强制结算！此时渲染引擎会把模糊层画死在底层，绝不会污染后续加入的 List
-        context.draw();
     }
 
     @Override

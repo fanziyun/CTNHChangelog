@@ -1,12 +1,12 @@
 package com.mmyddd.mcmod.changelog.client;
 
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,7 +51,6 @@ public class ChangelogDetailScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
-        // 注意：这里调用了 entry.getColor()，所以 ChangelogEntry 类里必须有这个方法
         int titleColor = (entry.getColor() & 0xFFFFFF) | 0xFF000000;
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 15, titleColor);
 
@@ -62,6 +61,7 @@ public class ChangelogDetailScreen extends Screen {
 
         renderTags(context, 40);
 
+        // 提示：如果文字不显示，请尝试注释掉下面这两行 Scissor
         context.enableScissor(listLeft - 5, listTop, listRight + 5, listBottom);
 
         int y = listTop - (int) this.scrollAmount;
@@ -78,6 +78,7 @@ public class ChangelogDetailScreen extends Screen {
 
         context.disableScissor();
 
+        // 绘制滚动条
         int viewHeight = this.listBottom - this.listTop;
         if (this.contentHeight > viewHeight) {
             int scrollBarHeight = (int) ((float) viewHeight * viewHeight / this.contentHeight);
@@ -118,6 +119,7 @@ public class ChangelogDetailScreen extends Screen {
         int viewHeight = this.listBottom - this.listTop;
         if (this.contentHeight > viewHeight) {
             double maxScroll = Math.max(0, this.contentHeight - viewHeight);
+            // 滚轮滚动，乘以16作为步长
             this.scrollAmount = MathHelper.clamp(this.scrollAmount - verticalAmount * 16, 0, maxScroll);
             return true;
         }
@@ -125,37 +127,40 @@ public class ChangelogDetailScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(Click click, boolean doubleClick) {
+        // 使用 Minecraft 实例获取经过缩放的精确鼠标坐标，解决 Click 对象点不出方法的问题
+        double mouseX = this.client.mouse.getX() * (double)this.client.getWindow().getScaledWidth() / (double)this.client.getWindow().getWidth();
+        double mouseY = this.client.mouse.getY() * (double)this.client.getWindow().getScaledHeight() / (double)this.client.getWindow().getHeight();
+
         int viewHeight = this.listBottom - this.listTop;
         if (this.contentHeight > viewHeight) {
+            // 判定是否点击在滚动条轨道上
             if (mouseX >= this.listRight + 2 && mouseX <= this.listRight + 6 &&
                     mouseY >= this.listTop && mouseY <= this.listBottom) {
                 this.isScrolling = true;
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubleClick);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        this.isScrolling = false;
-        return super.mouseReleased(mouseX, mouseY, button);
+    public boolean mouseReleased(Click click) {
+        this.isScrolling = false; // 停止拖动
+        return super.mouseReleased(click);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(Click click, double dragX, double dragY) {
         if (this.isScrolling) {
             int viewHeight = this.listBottom - this.listTop;
-            int maxScroll = Math.max(0, this.contentHeight - viewHeight);
-            if (maxScroll > 0) {
-                int scrollBarHeight = (int) ((float) viewHeight * viewHeight / this.contentHeight);
-                double scrollRatio = (mouseY - this.listTop) / (double) (viewHeight - scrollBarHeight);
-                this.scrollAmount = MathHelper.clamp(scrollRatio * maxScroll, 0, maxScroll);
-            }
+            double maxScroll = Math.max(0, this.contentHeight - viewHeight);
+            // 计算滚动比例并更新偏移量
+            double scrollFactor = (double) this.contentHeight / viewHeight;
+            this.scrollAmount = MathHelper.clamp(this.scrollAmount + dragY * scrollFactor, 0, maxScroll);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(click, dragX, dragY);
     }
 
     @Override

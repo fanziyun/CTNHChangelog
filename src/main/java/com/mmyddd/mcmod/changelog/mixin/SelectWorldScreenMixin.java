@@ -50,7 +50,6 @@ public abstract class SelectWorldScreenMixin extends Screen {
         this.addDrawableChild(ctnhChangelogButton);
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         // 如果需要绘制更新图标，逻辑同 TitleScreenMixin
     }
