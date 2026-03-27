@@ -32,11 +32,11 @@ public abstract class TitleScreenMixin extends Screen {
         }
     }
 
-    @Inject(method = "init", at = @At("TAIL"))
+    @Inject(method = "init", at = @At("RETURN"))
     private void onInitTail(CallbackInfo ci) {
         if (CTNHChangelog.config == null || !CTNHChangelog.config.showOnTitle) return;
 
-        int buttonY = this.height / 4 + 48 + 72 + 12 + 24;
+        int buttonY = this.height / 4 + 120;
 
         this.ctnhChangelogButton = ButtonWidget.builder(
                 Text.translatable("menu.ctnhchangelog.button"),
@@ -48,29 +48,27 @@ public abstract class TitleScreenMixin extends Screen {
                 }
         ).dimensions(this.width / 2 - 100, buttonY, 200, 20).build();
 
-        this.addDrawableChild(ctnhChangelogButton);
+        this.addDrawableChild(this.ctnhChangelogButton);
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
+    @Inject(method = "render", at = @At("RETURN"))
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (CTNHChangelog.config == null) return;
 
-        // 从 Config 读取动态版本和名称
         String displayVersion = CTNHChangelog.config.modpackVersion + " " + CTNHChangelog.config.modpackName;
         StringBuilder info = new StringBuilder(displayVersion);
 
         if (VersionCheckService.isCheckDone()) {
             if (VersionCheckService.hasUpdate()) {
-                // 使用翻译 Key
                 String updateLabel = Text.translatable("ctnhchangelog.update_found").getString();
                 info.append(" §6(").append(updateLabel).append(VersionCheckService.getLatestChangelogVersion()).append("!)");
 
-                if (ctnhChangelogButton != null) {
+                if (this.ctnhChangelogButton != null) {
                     boolean blink = (System.currentTimeMillis() / 500 & 1) == 1;
                     if (blink) {
                         context.drawTextWithShadow(this.textRenderer, "!",
-                                ctnhChangelogButton.getX() + ctnhChangelogButton.getWidth() - 12,
-                                ctnhChangelogButton.getY() + 6, 0xFF5555);
+                                this.ctnhChangelogButton.getX() + this.ctnhChangelogButton.getWidth() - 12,
+                                this.ctnhChangelogButton.getY() + 6, 0xFFFF5555);
                     }
                 }
             } else {
@@ -80,6 +78,14 @@ public abstract class TitleScreenMixin extends Screen {
             info.append(" §7(").append(Text.translatable("ctnhchangelog.checking").getString()).append(")");
         }
 
-        context.drawTextWithShadow(this.textRenderer, info.toString(), 2, this.height - 20, 0xFFFFFF);
+        String text = info.toString();
+        int textWidth = this.textRenderer.getWidth(text);
+        int x = 2;
+        int y = this.height - 11;
+
+        boolean isHovered = mouseX >= x && mouseX <= x + textWidth && mouseY >= y && mouseY <= y + 9;
+        int color = isHovered ? 0xFFFFFFFF : 0xFFAAAAAA;
+
+        context.drawTextWithShadow(this.textRenderer, text, x, y, color);
     }
-} // 类结束的括号，确保它在这里
+}

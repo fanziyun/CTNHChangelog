@@ -18,7 +18,6 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
         super(client, width, height, top, itemHeight);
         this.parentScreen = parentScreen;
 
-        // 加载数据到列表
         if (ChangelogEntry.isLoaded()) {
             for (ChangelogEntry entry : ChangelogEntry.getAllEntries()) {
                 this.addEntry(new Entry(entry));
@@ -27,9 +26,7 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
     }
 
     @Override
-    public void appendClickableNarrations(NarrationMessageBuilder builder) {
-        // 1.21 必需的抽象方法实现
-    }
+    public void appendClickableNarrations(NarrationMessageBuilder builder) {}
 
     public class Entry extends EntryListWidget.Entry<Entry> {
         private final ChangelogEntry entry;
@@ -38,21 +35,28 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
             this.entry = entry;
         }
 
-        // --- 核心修复：1.21.9 的 5 参数签名，删除 super.render ---
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, boolean isSelected, float delta) {
-            // 注意：这里没有 super.render(...) 这一行！
-            // 这可以防止父类绘制默认的半透明黑色背景。
-
             MinecraftClient client = MinecraftClient.getInstance();
-
-            // 在 1.21 新环境里，条目自己带有坐标
             int x = this.getX();
             int y = this.getY();
             int entryWidth = ChangelogList.this.getRowWidth();
+            int entryHeight = ChangelogList.this.itemHeight;
 
-            // 1. 绘制版本号 (青色加粗)
-            Text vText = Text.literal(entry.getVersion()).formatted(Formatting.AQUA, Formatting.BOLD);
+            // --- 核心高亮判定逻辑 ---
+            // 判断鼠标是否在当前这一行的矩形范围内
+            boolean isHovered = mouseX >= x && mouseX <= x + entryWidth && mouseY >= y && mouseY <= y + entryHeight;
+
+            // 定义颜色：指上去白色 (0xFFFFFFFF)，没指上去灰色 (0xFFAAAAAA)
+            int mainColor = isHovered ? 0xFFFFFFFF : 0xFFAAAAAA;
+            // 判定背景：指上去时铺一层淡淡的白光遮罩 (约 12% 透明度)
+            if (isHovered) {
+                context.fill(x - 2, y, x + entryWidth + 2, y + entryHeight, 0x20FFFFFF);
+            }
+
+            // 1. 绘制版本号 (高亮时为青色，常态为暗青色)
+            Formatting vFormat = isHovered ? Formatting.AQUA : Formatting.DARK_AQUA;
+            Text vText = Text.literal(entry.getVersion()).formatted(vFormat, Formatting.BOLD);
             context.drawTextWithShadow(client.textRenderer, vText, x + 5, y + 4, 0xFFFFFFFF);
 
             // 2. 动态绘制标签 (Types + Tags)
@@ -66,19 +70,20 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
                 int labelWidth = client.textRenderer.getWidth(displayLabel);
                 int labelColor = ChangelogEntry.getTagColor(label);
 
-                // 绘制标签背景和文字
-                context.fill(currentX - 2, y + 3, currentX + labelWidth + 2, y + 13, (labelColor & 0xFFFFFF) | 0xFF000000);
+                // 标签背景：高亮时完全不透明，常态时带一点透明度
+                int alpha = isHovered ? 0xFF000000 : 0xAA000000;
+                context.fill(currentX - 2, y + 3, currentX + labelWidth + 2, y + 13, (labelColor & 0xFFFFFF) | alpha);
                 context.drawText(client.textRenderer, displayLabel, currentX, y + 4, 0xFFFFFFFF, false);
 
                 currentX += labelWidth + 8;
             }
 
-            // 3. 绘制日期 (靠右对齐)
-            Text dText = Text.literal(entry.getDate()).formatted(Formatting.GRAY);
+            // 3. 绘制日期 (随悬停变色)
+            Text dText = Text.literal(entry.getDate());
             int dateWidth = client.textRenderer.getWidth(dText);
-            context.drawTextWithShadow(client.textRenderer, dText, x + entryWidth - dateWidth - 5, y + 4, 0xFFFFFFFF);
+            context.drawTextWithShadow(client.textRenderer, dText, x + entryWidth - dateWidth - 5, y + 4, mainColor);
 
-            // 4. 绘制标题预览 (第二行)
+            // 4. 绘制标题预览 (随悬停变色)
             String preview = entry.getTitle();
             if (preview == null || preview.isEmpty()) {
                 preview = !entry.getChanges().isEmpty() ? entry.getChanges().get(0) : "No description";
@@ -86,12 +91,9 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
             if (preview.length() > 40) {
                 preview = preview.substring(0, 37) + "...";
             }
-            context.drawTextWithShadow(client.textRenderer, Text.literal(preview).formatted(Formatting.WHITE), x + 5, y + 18, 0xFFCCCCCC);
-
-            // --- 核心修复：直接删除了原本的 fill 遮罩逻辑 ---
+            context.drawTextWithShadow(client.textRenderer, Text.literal(preview), x + 5, y + 18, isHovered ? 0xFFFFFFFF : 0xFF999999);
         }
 
-        // 这里的 Click 签名在日志里没有报错，说明是正确的
         @Override
         public boolean mouseClicked(Click click, boolean doubleClick) {
             if (click.button() == 0) {
@@ -112,25 +114,16 @@ public class ChangelogList extends EntryListWidget<ChangelogList.Entry> {
         return 300;
     }
 
-    // --- 核心修复：1.21 方法改名 ---
     @Override
     protected int getScrollbarX() {
         return this.width - 10;
     }
-    // 1. 去掉列表背景（那个深色的槽位）
+
     @Override
     public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 我们只调用渲染条目的逻辑，跳过父类中渲染深色槽位的逻辑
         this.renderList(context, mouseX, mouseY, delta);
     }
 
-    // 2. 1.21 新版：确保背景是透明的
     @Override
-    protected void drawHeaderAndFooterSeparators(DrawContext context) {
-        // 留空：去掉顶部和底部的两道深色分割线遮罩
-    }
-
-
-
-
+    protected void drawHeaderAndFooterSeparators(DrawContext context) {}
 }

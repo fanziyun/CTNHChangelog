@@ -1,5 +1,6 @@
 package com.mmyddd.mcmod.changelog.client;
 
+import com.mmyddd.mcmod.changelog.CTNHChangelog;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -7,6 +8,7 @@ import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Util;
 
 public class ChangelogOverviewScreen extends Screen {
     private final Screen parent;
@@ -18,7 +20,6 @@ public class ChangelogOverviewScreen extends Screen {
 
     @Override
     protected void init() {
-        // 1. 刷新按钮
         this.addDrawableChild(ButtonWidget.builder(Text.literal("↻").formatted(Formatting.BOLD), button -> {
             ChangelogEntry.resetLoaded();
             if (this.client != null) {
@@ -27,41 +28,47 @@ public class ChangelogOverviewScreen extends Screen {
             }
         }).dimensions(this.width - 30, 10, 20, 20).build());
 
-        // 2. 返回按钮
-        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.back"), button -> this.close())
-                .dimensions(this.width / 2 - 100, this.height - 30, 200, 20).build());
+        int totalWidth = 204;
+        int spacing = 4;
+        int linkWidth = totalWidth / 3;
+        int backWidth = totalWidth - linkWidth - spacing;
+        int startX = this.width / 2 - totalWidth / 2;
+        int y = this.height - 30;
 
-        // 3. 【核心修复 1】标准化的异步 UI 加载
-        // 我们不再在 render 方法里动态创建列表，而是在 init 初始化时搞定。
+        // 从 Config 读取按钮名字和 URL
+        String btnName = CTNHChangelog.config.getExternalLinkName();
+        String url = CTNHChangelog.config.getExternalLinkUrl();
+
+        this.addDrawableChild(ButtonWidget.builder(Text.literal(btnName), button -> {
+            if (url != null && !url.isEmpty()) {
+                Util.getOperatingSystem().open(url);
+            }
+        }).dimensions(startX, y, linkWidth, 20).build());
+
+        this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.back"), button -> this.close())
+                .dimensions(startX + linkWidth + spacing, y, backWidth, 20).build());
+
         if (ChangelogEntry.isLoaded()) {
             ChangelogList list = new ChangelogList(this.client, this.width, this.height, 40, 48, this);
-            // 将列表注册为可绘制组件，让 Minecraft 引擎负责它的渲染和状态隔离！
             this.addDrawableChild(list);
         } else if (!ChangelogEntry.isLoading()) {
             ChangelogEntry.loadAfterConfig().thenRun(() -> {
                 if (this.client != null) {
-                    // 数据下载完毕后，重新触发 init() 构建列表
                     this.client.execute(this::clearAndInit);
                 }
             });
         }
     }
 
-    // 【核心修复 2】覆写专属的背景渲染方法
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 1. 画旋转背景
         this.renderPanoramaBackground(context, delta);
-        // 2. 开启原版模糊
         this.renderInGameBackground(context);
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 这一步会自动调用上面的 renderBackground，然后安全地绘制按钮和列表
         super.render(context, mouseX, mouseY, delta);
-
-        // 绝对置顶的文字层
         this.drawHeaderAndFooter(context);
     }
 

@@ -20,7 +20,7 @@ public class Config {
     private static String modpackVersion = "1.0.0";
     private static boolean enableVersionCheck = true;
     private static boolean showOnTitle = true;
-    private static boolean showOnSelectWorld = true;
+    private static boolean showOnSelectWorld = false;
 
     public static void load() {
         if (!CONFIG_FILE.exists()) {
@@ -54,7 +54,20 @@ public class Config {
             e.printStackTrace();
         }
     }
+    public class CTNHChangelogConfig {
+        // 按钮显示的文字
+        public String externalLinkName = "项目主页";
+        // 按钮跳转的链接
+        public String externalLinkUrl = "https://github.com/FanZiyun";
 
+        public String getExternalLinkName() {
+            return externalLinkName != null ? externalLinkName : "Link";
+        }
+
+        public String getExternalLinkUrl() {
+            return externalLinkUrl != null ? externalLinkUrl : "";
+        }
+    }
     // --- 供其他类调用的 Getter ---
     public static String getChangelogUrl() { return changelogUrl; }
     public static String getModpackVersion() { return modpackVersion; }

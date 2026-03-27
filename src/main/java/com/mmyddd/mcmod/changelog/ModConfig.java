@@ -20,4 +20,19 @@ public class ModConfig implements ConfigData {
 
     public boolean showOnTitle = true;
 
+    // 外部链接配置 - 直接放在这里
+    @ConfigEntry.Gui.Tooltip
+    public String externalLinkName = "项目主页";
+
+    @ConfigEntry.Gui.Tooltip
+    public String externalLinkUrl = "https://github.com/FanZiyun";
+
+    // 提供给 Screen 调用的接口方法
+    public String getExternalLinkName() {
+        return (externalLinkName == null || externalLinkName.isEmpty()) ? "Link" : externalLinkName;
+    }
+
+    public String getExternalLinkUrl() {
+        return (externalLinkUrl == null || externalLinkUrl.isEmpty()) ? "" : externalLinkUrl;
+    }
 }
