@@ -3,34 +3,28 @@ package com.mmyddd.mcmod.changelog.client;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.sound.PositionedSoundInstance;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 public class ChangelogOverviewScreen extends Screen {
     private final Screen parent;
     private ChangelogList list;
-    private boolean listInitialized = false;
 
     public ChangelogOverviewScreen(Screen parent) {
-        super(Text.literal("整合包更新日志"));
+        super(Text.translatable("menu.ctnhchangelog.title"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        // 1. 刷新按钮 (↻)
+        // 1. 刷新按钮
         this.addDrawableChild(ButtonWidget.builder(Text.literal("↻").formatted(Formatting.BOLD), button -> {
             ChangelogEntry.resetLoaded();
-            this.listInitialized = false;
-            // 异步加载并重启 Screen
-            ChangelogEntry.loadAfterConfig().thenRun(() -> {
-                if (this.client != null) {
-                    this.client.execute(this::clearAndInit);
-                }
-            });
             if (this.client != null) {
-                this.client.getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.master(
-                        net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1.2F));
+                this.client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.2F));
+                ChangelogEntry.loadAfterConfig().thenRun(() -> this.client.execute(this::clearAndInit));
             }
         }).dimensions(this.width - 30, 10, 20, 20).build());
 
@@ -38,42 +32,54 @@ public class ChangelogOverviewScreen extends Screen {
         this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.back"), button -> this.close())
                 .dimensions(this.width / 2 - 100, this.height - 30, 200, 20).build());
 
-        // 3. 核心逻辑：只要数据好了，立刻创建 UI
+        // 3. 【核心修复 1】标准化的异步 UI 加载
+        // 我们不再在 render 方法里动态创建列表，而是在 init 初始化时搞定。
         if (ChangelogEntry.isLoaded()) {
-            this.createList();
+            this.list = new ChangelogList(this.client, this.width, this.height, 40, 48, this);
+            // 将列表注册为可绘制组件，让 Minecraft 引擎负责它的渲染和状态隔离！
+            this.addDrawableChild(this.list);
         } else if (!ChangelogEntry.isLoading()) {
-            ChangelogEntry.loadAfterConfig();
+            ChangelogEntry.loadAfterConfig().thenRun(() -> {
+                if (this.client != null) {
+                    // 数据下载完毕后，重新触发 init() 构建列表
+                    this.client.execute(this::clearAndInit);
+                }
+            });
         }
     }
 
-    private void createList() {
-        // 修复：直接重新赋值并添加，不再调用找不到的 removeInternal
-        this.list = new ChangelogList(this.client, this.width, this.height, 40, 40, this);
-        this.addDrawableChild(this.list);
-        this.listInitialized = true;
+    // 【核心修复 2】覆写专属的背景渲染方法
+    @Override
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+        // 1. 画旋转背景
+        this.renderPanoramaBackground(context, delta);
+        // 2. 开启原版模糊
+        this.renderInGameBackground(context);
+        // 3. 强制结算！此时渲染引擎会把模糊层画死在底层，绝不会污染后续加入的 List
+        context.draw();
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
-
-        // 如果在渲染期间数据才加载完，补全 UI
-        if (ChangelogEntry.isLoaded() && !listInitialized) {
-            this.createList();
-        }
-
+        // 这一步会自动调用上面的 renderBackground，然后安全地绘制按钮和列表
         super.render(context, mouseX, mouseY, delta);
 
-        if (ChangelogEntry.isLoading()) {
-            context.drawCenteredTextWithShadow(this.textRenderer, "正在从服务器获取最新内容...", this.width / 2, this.height / 2, 0xFFFFAA00);
-        }
+        // 绝对置顶的文字层
+        this.drawHeaderAndFooter(context);
+    }
 
+    private void drawHeaderAndFooter(DrawContext context) {
         context.drawCenteredTextWithShadow(this.textRenderer, this.getTitle(), this.width / 2, 15, 0xFFFFFFFF);
+        if (ChangelogEntry.isLoading()) {
+            context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("正在获取最新内容..."), this.width / 2, this.height / 2, 0xFFFFAA00);
+        }
         context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(ChangelogEntry.getFooterText()), this.width / 2, this.height - 45, 0xAAAAAA);
     }
 
     @Override
     public void close() {
-        if (this.client != null) this.client.setScreen(this.parent);
+        if (this.client != null) {
+            this.client.setScreen(this.parent);
+        }
     }
 }

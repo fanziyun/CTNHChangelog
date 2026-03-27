@@ -1,14 +1,14 @@
 {
-  "text.autoconfig.ctnhchangelog.title": "更新日志配置",
+  "menu.ctnhchangelog.button": "更新日志",
 
+  "text.autoconfig.ctnhchangelog.title": "CTNH 更新日志设置",
   "text.autoconfig.ctnhchangelog.option.changelogUrl": "更新日志 URL",
   "text.autoconfig.ctnhchangelog.option.changelogUrl.@Tooltip": "指向 changelog.json 的远程链接",
-
   "text.autoconfig.ctnhchangelog.option.modpackVersion": "当前整合包版本",
+  "text.autoconfig.ctnhchangelog.option.enableVersionCheck": "启用自动检查更新",
+  "text.autoconfig.ctnhchangelog.option.showOnTitle": "在主菜单显示按钮",
+  "text.autoconfig.ctnhchangelog.option.showOnSelectWorld": "在存档选择界面显示",
+  "menu.ctnhchangelog.title": "整合包更新日志",
+  "gui.back": "返回"
 
-  "text.autoconfig.ctnhchangelog.option.enableVersionCheck": "启用版本检查",
-
-  "text.autoconfig.ctnhchangelog.option.showOnTitle": "在主界面显示",
-
-  "text.autoconfig.ctnhchangelog.option.showOnSelectWorld": "在世界选择界面显示"
 }

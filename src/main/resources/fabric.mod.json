@@ -11,12 +11,12 @@
   "environment": "client",
   "entrypoints": {
     "client": [
-      "com.mmyddd.mcmod.changelog.CTNHChangelog",
-      "me.ziyun.ctnhchangelog.CTNHChangelogClient"
+      "com.mmyddd.mcmod.changelog.CTNHChangelog"
     ],
     "modmenu": [
       "com.mmyddd.mcmod.changelog.ModMenuIntegration"
     ]
+
   },
   "mixins": [
     "ctnhchangelog.mixins.json"

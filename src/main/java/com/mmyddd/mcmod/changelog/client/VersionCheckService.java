@@ -7,111 +7,111 @@ import com.mmyddd.mcmod.changelog.CTNHChangelog;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Environment(EnvType.CLIENT)
 public class VersionCheckService {
-    // 使用守护线程池，防止程序关闭时被阻塞
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r);
         t.setDaemon(true);
         return t;
     });
 
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(8))
+            .followRedirects(HttpClient.Redirect.ALWAYS)
+            .build();
+
     private static volatile boolean hasUpdate = false;
     private static volatile boolean checkDone = false;
     private static volatile String latestChangelogVersion = "";
 
     public static void checkForUpdate() {
-        if (!Config.isEnableVersionCheck()) {
-            CTNHChangelog.LOGGER.info("[VersionCheck] 配置文件中已禁用版本检查");
+        if (CTNHChangelog.config == null) return;
+        if (!CTNHChangelog.config.enableVersionCheck) {
             checkDone = true;
             return;
         }
 
-        String currentVersion = Config.getModpackVersion();
-        String urlStr = Config.getChangelogUrl();
+        String currentVersion = CTNHChangelog.config.modpackVersion;
+        String urlStr = CTNHChangelog.config.changelogUrl;
 
         if (currentVersion.isEmpty() || urlStr.isEmpty() || urlStr.contains("example.com")) {
-            CTNHChangelog.LOGGER.info("[VersionCheck] 版本号或 URL 未配置，跳过检查");
             checkDone = true;
             return;
         }
+
+        if (urlStr.contains("github.com") && urlStr.contains("/blob/")) {
+            urlStr = urlStr.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
+        }
+
+        final String finalUrl = urlStr;
 
         CompletableFuture.runAsync(() -> {
             try {
-                String changelogVersion = fetchChangelogVersion(urlStr);
-                if (changelogVersion != null && !changelogVersion.isEmpty()) {
-                    latestChangelogVersion = changelogVersion;
-                    // 版本比对：如果不一致则视为有更新
-                    hasUpdate = !changelogVersion.equalsIgnoreCase(currentVersion);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(finalUrl))
+                        .header("User-Agent", "CTNH-Changelog-Fabric/1.21.1")
+                        .timeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() == 200) {
+                    JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+                    if (root.has("entries")) {
+                        JsonArray entries = root.getAsJsonArray("entries");
+                        if (!entries.isEmpty()) {
+                            JsonObject latestEntry = entries.get(0).getAsJsonObject();
+                            if (latestEntry.has("version")) {
+                                String remoteVer = latestEntry.get("version").getAsString();
+                                latestChangelogVersion = remoteVer;
+                                hasUpdate = isVersionNewer(currentVersion, remoteVer);
+                            }
+                        }
+                    }
                 }
             } catch (Exception e) {
-                CTNHChangelog.LOGGER.error("[VersionCheck] 检查更新时发生异常: ", e);
+                CTNHChangelog.LOGGER.error("[VersionCheck] 检查更新失败: {}", e.getMessage());
             } finally {
                 checkDone = true;
-                CTNHChangelog.LOGGER.info("[VersionCheck] 检查完成: 有新版本={}, 当前={}, 最新={}",
-                        hasUpdate, currentVersion, latestChangelogVersion);
             }
         }, EXECUTOR);
     }
 
-    private static String fetchChangelogVersion(String urlStr) throws Exception {
-        HttpURLConnection conn = null;
+    private static boolean isVersionNewer(String local, String remote) {
+        if (local == null || remote == null || local.equalsIgnoreCase(remote)) return false;
         try {
-            URL url = URI.create(urlStr).toURL();
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-            conn.setRequestProperty("User-Agent", "CTNH-Changelog-Fabric/1.21.1");
-
-            int responseCode = conn.getResponseCode();
-            if (responseCode != 200) {
-                CTNHChangelog.LOGGER.warn("[VersionCheck] 无法获取更新日志, HTTP 响应码: {}", responseCode);
-                return null;
+            String v1 = local.replaceAll("[^\\d.]", "");
+            String v2 = remote.replaceAll("[^\\d.]", "");
+            String[] vals1 = v1.split("\\.");
+            String[] vals2 = v2.split("\\.");
+            int length = Math.max(vals1.length, vals2.length);
+            for (int i = 0; i < length; i++) {
+                int num1 = i < vals1.length ? Integer.parseInt(vals1[i]) : 0;
+                int num2 = i < vals2.length ? Integer.parseInt(vals2[i]) : 0;
+                if (num2 > num1) return true;
+                if (num1 > num2) return false;
             }
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
-                JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
-                if (root.has("entries")) {
-                    JsonArray entries = root.getAsJsonArray("entries");
-                    if (entries.size() > 0) {
-                        // 假设第一个 entry 是最新版本
-                        JsonObject latestEntry = entries.get(0).getAsJsonObject();
-                        if (latestEntry.has("version")) {
-                            return latestEntry.get("version").getAsString();
-                        }
-                    }
-                }
-            }
-        } finally {
-            if (conn != null) {
-                conn.disconnect();
-            }
+        } catch (Exception e) {
+            return !local.equalsIgnoreCase(remote);
         }
-        return null;
+        return false;
     }
 
-    // --- Getter 方法 ---
+    public static boolean isCheckDone() { return checkDone; }
 
-    public static boolean isCheckDone() {
-        return checkDone;
-    }
-
-    public static String getLatestChangelogVersion() {
-        return latestChangelogVersion;
-    }
+    public static String getLatestChangelogVersion() { return latestChangelogVersion; }
 
     public static boolean hasUpdate() {
-        // 只有开启了检查且检查到更新时才返回 true
-        return Config.isEnableVersionCheck() && hasUpdate;
+        return CTNHChangelog.config != null && CTNHChangelog.config.enableVersionCheck && hasUpdate;
     }
 
     public static void reset() {

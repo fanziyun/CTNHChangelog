@@ -1,16 +1,14 @@
 package com.mmyddd.mcmod.changelog.mixin;
 
+import com.mmyddd.mcmod.changelog.CTNHChangelog;
 import com.mmyddd.mcmod.changelog.client.ChangelogEntry;
 import com.mmyddd.mcmod.changelog.client.ChangelogOverviewScreen;
-import com.mmyddd.mcmod.changelog.client.Config;
 import com.mmyddd.mcmod.changelog.client.VersionCheckService;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,80 +21,62 @@ public abstract class TitleScreenMixin extends Screen {
     @Unique
     private ButtonWidget ctnhChangelogButton;
 
-    @Unique
-    private boolean ctnhHasUpdate = false;
-
-    @Unique
-    private static final int BLINK_INTERVAL = 800;
-
-    @Unique
-    private static final Identifier VERSION_CHECK_ICONS =
-            Identifier.of("minecraft", "textures/gui/sprites/hud/heart/container.png"); // 建议换成你自己的资源路径
-
     protected TitleScreenMixin(Text title) {
         super(title);
     }
 
     @Inject(method = "init", at = @At("HEAD"))
     private void onInitHead(CallbackInfo ci) {
-        // 确保 Config 类里有这些静态方法
-        if (Config.isChangelogTabEnabled() && !Config.getModpackVersion().isEmpty()) {
-            VersionCheckService.reset();
+        if (CTNHChangelog.config != null && CTNHChangelog.config.enableVersionCheck) {
             VersionCheckService.checkForUpdate();
         }
     }
 
     @Inject(method = "init", at = @At("TAIL"))
-    private void onInit(CallbackInfo ci) {
-        if (!Config.isChangelogTabEnabled() || Config.getModpackVersion().isEmpty()) return;
-        if (!Config.showButtonOnTitleScreen()) return;
+    private void onInitTail(CallbackInfo ci) {
+        if (CTNHChangelog.config == null) return;
 
-        int l = this.height / 4 + 48;
-        int buttonY = l + 72 + 12 + 24;
+        int buttonY = this.height / 4 + 48 + 72 + 12 + 24;
 
-        // Fabric 1.21.1 使用 ButtonWidget.builder
         this.ctnhChangelogButton = ButtonWidget.builder(
-                Text.translatable("ctnhchangelog.button.changelog"),
+                Text.translatable("menu.ctnhchangelog.button"),
                 button -> {
-                    ChangelogEntry.resetLoaded();
                     ChangelogEntry.loadAfterConfig();
-                    MinecraftClient.getInstance().setScreen(
-                            new ChangelogOverviewScreen(this)
-                    );
+                    if (this.client != null) {
+                        this.client.setScreen(new ChangelogOverviewScreen(this));
+                    }
                 }
         ).dimensions(this.width / 2 - 100, buttonY, 200, 20).build();
 
         this.addDrawableChild(ctnhChangelogButton);
     }
 
-    @Override
-    public void tick() {
-        super.tick();
-        if (Config.isEnableVersionCheck() && VersionCheckService.isCheckDone()) {
-            ctnhHasUpdate = VersionCheckService.hasUpdate();
-        } else {
-            ctnhHasUpdate = false;
-        }
-    }
-
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        if (!ctnhHasUpdate || ctnhChangelogButton == null) return;
+        if (CTNHChangelog.config == null) return;
 
-        int x = ctnhChangelogButton.getX();
-        int y = ctnhChangelogButton.getY();
-        int w = ctnhChangelogButton.getWidth();
-        int h = ctnhChangelogButton.getHeight();
+        String localVer = CTNHChangelog.config.modpackVersion;
+        StringBuilder info = new StringBuilder("363 Modpack: v").append(localVer);
 
-        int iconX = x + w - 15;
-        int iconY = y + (h / 2 - 4);
+        if (VersionCheckService.isCheckDone()) {
+            if (VersionCheckService.hasUpdate()) {
+                info.append(" §6(发现新版本: v").append(VersionCheckService.getLatestChangelogVersion()).append("!)");
 
-        boolean blink = (System.currentTimeMillis() / BLINK_INTERVAL & 1) == 1;
-
-        // 1.21.1 绘制纹理建议使用 DrawContext.drawTexture
-        if (blink) {
-            // 参数依次为: 纹理标识符, x, y, u, v, width, height, textureWidth, textureHeight
-            context.drawTexture(VERSION_CHECK_ICONS, iconX, iconY, 0, 0, 8, 8, 8, 8);
+                if (ctnhChangelogButton != null) {
+                    boolean blink = (System.currentTimeMillis() / 500 & 1) == 1;
+                    if (blink) {
+                        context.drawTextWithShadow(this.textRenderer, "!",
+                                ctnhChangelogButton.getX() + ctnhChangelogButton.getWidth() - 12,
+                                ctnhChangelogButton.getY() + 6, 0xFF5555);
+                    }
+                }
+            } else {
+                info.append(" §a(已是最新)");
+            }
+        } else {
+            info.append(" §7(正在检查更新...)");
         }
+
+        context.drawTextWithShadow(this.textRenderer, info.toString(), 2, this.height - 20, 0xFFFFFF);
     }
 }

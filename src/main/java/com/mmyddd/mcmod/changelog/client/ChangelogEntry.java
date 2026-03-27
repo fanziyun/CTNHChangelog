@@ -4,10 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.JsonReader;
 import com.mmyddd.mcmod.changelog.CTNHChangelog;
 
-import java.io.StringReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -58,14 +56,30 @@ public class ChangelogEntry {
         if (loading) return CompletableFuture.completedFuture(null);
         loading = true;
 
-        String url = Config.getChangelogUrl().trim();
+        // 核心修复 1: 必须从主类注册的 config 实例拿数据，否则永远是默认值
+        if (CTNHChangelog.config == null) {
+            System.err.println("[整合包更新日志] 配置实例尚未初始化，取消下载。");
+            loading = false;
+            return CompletableFuture.completedFuture(null);
+        }
+
+        String url = CTNHChangelog.config.changelogUrl.trim();
+
+        // 核心修复 2: 增强型 URL 容错处理 (解决 404)
+        // 处理 GitHub 的 blob 链接转 raw 链接
         if (url.contains("github.com") && url.contains("/blob/")) {
-            url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
+            url = url.replace("github.com", "raw.githubusercontent.com")
+                    .replace("/blob/", "/");
+        }
+
+        // 自动处理代理前缀导致的重复或格式问题
+        if (url.startsWith("https://gh-proxy.org/https://raw.githubusercontent.com")) {
+            // 这种拼接通常是安全的，但如果依然 404，建议直接在配置里填 raw 链接
         }
 
         String finalUrl = url + (url.contains("?") ? "&" : "?") + "v=" + System.currentTimeMillis();
 
-        System.out.println("[整合包更新日志] 正在从远程获取数据...");
+        System.out.println("[整合包更新日志] 正在从远程获取数据: " + url);
 
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -74,7 +88,7 @@ public class ChangelogEntry {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(finalUrl))
-                .header("User-Agent", "Mozilla/5.0")
+                .header("User-Agent", "Mozilla/5.0 (CTNH-Changelog-Loader)")
                 .header("Cache-Control", "no-cache")
                 .build();
 
@@ -82,8 +96,9 @@ public class ChangelogEntry {
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
                         parseJson(response.body());
+                        System.out.println("[整合包更新日志] 数据解析完成，共加载 " + ENTRIES.size() + " 条更新。");
                     } else {
-                        System.err.println("[整合包更新日志] 刷新失败，错误码: " + response.statusCode());
+                        System.err.println("[整合包更新日志] 刷新失败，错误码: " + response.statusCode() + " (请检查 URL 是否为 Raw 格式)");
                     }
                     return null;
                 })
@@ -145,9 +160,9 @@ public class ChangelogEntry {
     public static boolean isLoading() { return loading; }
     public static boolean isLoaded() { return loaded; }
 
-    // 这里改成了“整合包”
     public static String getFooterText() {
-        return (remoteFooter == null || remoteFooter.isEmpty()) ? "§b整合包更新日志 §7| §f" + Config.getModpackVersion() : remoteFooter;
+        String ver = (CTNHChangelog.config != null) ? CTNHChangelog.config.modpackVersion : "Unknown";
+        return (remoteFooter == null || remoteFooter.isEmpty()) ? "§b整合包更新日志 §7| §f" + ver : remoteFooter;
     }
 
     public static int getTagColor(String tag) { return CUSTOM_TAG_COLORS.getOrDefault(tag, 0xFFFFAA00); }
