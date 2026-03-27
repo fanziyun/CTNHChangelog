@@ -1,18 +1,19 @@
 {
-  "ctnhchangelog.tab.title": "Changelog",
-  "ctnhchangelog.button.changelog": "Changelog",
-  "ctnhchangelog.button.view_changelog": "Double click to view details",
-  "ctnhchangelog.type.major": "Major Update",
-  "ctnhchangelog.type.minor": "Feature Update",
-  "ctnhchangelog.type.patch": "Patch",
-  "ctnhchangelog.type.hotfix": "Hotfix",
-  "ctnhchangelog.type.danger": "Your save file may be corrupted",
-  "ctnhchangelog.date": "Date",
-  "ctnhchangelog.version": "Version",
-  "ctnhchangelog.changes": "Changes",
-  "ctnhchangelog.more_changes": "and %s more changes...",
-  "ctnhchangelog.stats": "Total %s versions",
-  "ctnhchangelog.loading": "Loading...",
-  "ctnhchangelog.update_available":  "Update found! Current version: %s, Latest version: %s",
-  "menu.ctnhchangelog.button": "1"
+  "menu.ctnhchangelog.button": "Changelog",
+  "menu.ctnhchangelog.title": "Modpack Changelog",
+
+  "ctnhchangelog.update_found": "New version found: v",
+  "ctnhchangelog.is_latest": "Up to date",
+  "ctnhchangelog.checking": "Checking for updates...",
+  "ctnhchangelog.update_available_short": "New version found: v%s!",
+
+  "text.autoconfig.ctnhchangelog.title": "CTNH Changelog Settings",
+  "text.autoconfig.ctnhchangelog.option.changelogUrl": "Changelog URL",
+  "text.autoconfig.ctnhchangelog.option.modpackVersion": "Current Modpack Version",
+  "text.autoconfig.ctnhchangelog.option.modpackName": "Modpack Display Name",
+  "text.autoconfig.ctnhchangelog.option.enableVersionCheck": "Enable Auto Update Check",
+  "text.autoconfig.ctnhchangelog.option.showOnTitle": "Show Button on Main Menu",
+  "text.autoconfig.ctnhchangelog.option.showOnSelectWorld": "Show on World Selection Screen",
+
+  "gui.back": "Back"
 }

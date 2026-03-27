@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class TitleScreenMixin extends Screen {
 
     @Unique
-    private ButtonWidget ctnChangelogButton;
+    private ButtonWidget ctnhChangelogButton;
 
     protected TitleScreenMixin(Text title) {
         super(title);
@@ -34,11 +34,11 @@ public abstract class TitleScreenMixin extends Screen {
 
     @Inject(method = "init", at = @At("TAIL"))
     private void onInitTail(CallbackInfo ci) {
-        if (CTNHChangelog.config == null) return;
+        if (CTNHChangelog.config == null || !CTNHChangelog.config.showOnTitle) return;
 
         int buttonY = this.height / 4 + 48 + 72 + 12 + 24;
 
-        this.ctnChangelogButton = ButtonWidget.builder(
+        this.ctnhChangelogButton = ButtonWidget.builder(
                 Text.translatable("menu.ctnhchangelog.button"),
                 button -> {
                     ChangelogEntry.loadAfterConfig();
@@ -48,35 +48,38 @@ public abstract class TitleScreenMixin extends Screen {
                 }
         ).dimensions(this.width / 2 - 100, buttonY, 200, 20).build();
 
-        this.addDrawableChild(ctnChangelogButton);
+        this.addDrawableChild(ctnhChangelogButton);
     }
 
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (CTNHChangelog.config == null) return;
 
-        String localVer = CTNHChangelog.config.modpackVersion;
-        StringBuilder info = new StringBuilder("363 Modpack: v").append(localVer);
+        // 从 Config 读取动态版本和名称
+        String displayVersion = CTNHChangelog.config.modpackVersion + " " + CTNHChangelog.config.modpackName;
+        StringBuilder info = new StringBuilder(displayVersion);
 
         if (VersionCheckService.isCheckDone()) {
             if (VersionCheckService.hasUpdate()) {
-                info.append(" §6(发现新版本: v").append(VersionCheckService.getLatestChangelogVersion()).append("!)");
+                // 使用翻译 Key
+                String updateLabel = Text.translatable("ctnhchangelog.update_found").getString();
+                info.append(" §6(").append(updateLabel).append(VersionCheckService.getLatestChangelogVersion()).append("!)");
 
-                if (ctnChangelogButton != null) {
+                if (ctnhChangelogButton != null) {
                     boolean blink = (System.currentTimeMillis() / 500 & 1) == 1;
                     if (blink) {
                         context.drawTextWithShadow(this.textRenderer, "!",
-                                ctnChangelogButton.getX() + ctnChangelogButton.getWidth() - 12,
-                                ctnChangelogButton.getY() + 6, 0xFF5555);
+                                ctnhChangelogButton.getX() + ctnhChangelogButton.getWidth() - 12,
+                                ctnhChangelogButton.getY() + 6, 0xFF5555);
                     }
                 }
             } else {
-                info.append(" §a(已是最新)");
+                info.append(" §a(").append(Text.translatable("ctnhchangelog.is_latest").getString()).append(")");
             }
         } else {
-            info.append(" §7(正在检查更新...)");
+            info.append(" §7(").append(Text.translatable("ctnhchangelog.checking").getString()).append(")");
         }
 
         context.drawTextWithShadow(this.textRenderer, info.toString(), 2, this.height - 20, 0xFFFFFF);
     }
-}
+} // 类结束的括号，确保它在这里
