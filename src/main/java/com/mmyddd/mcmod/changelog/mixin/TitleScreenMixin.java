@@ -25,18 +25,12 @@ public abstract class TitleScreenMixin extends Screen {
         super(title);
     }
 
-    @Inject(method = "init", at = @At("HEAD"))
-    private void onInitHead(CallbackInfo ci) {
-        if (CTNHChangelog.config != null && CTNHChangelog.config.enableVersionCheck) {
-            VersionCheckService.checkForUpdate();
-        }
-    }
-
     @Inject(method = "init", at = @At("RETURN"))
     private void onInitTail(CallbackInfo ci) {
         if (CTNHChangelog.config == null || !CTNHChangelog.config.showOnTitle) return;
 
-        int buttonY = this.height / 4 + 120;
+        // 从配置读取按钮 Y 轴偏移量
+        int buttonY = this.height / 4 + CTNHChangelog.config.buttonYOffset;
 
         this.ctnhChangelogButton = ButtonWidget.builder(
                 Text.translatable("menu.ctnhchangelog.button"),
@@ -55,37 +49,32 @@ public abstract class TitleScreenMixin extends Screen {
     private void onRender(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (CTNHChangelog.config == null) return;
 
-        String displayVersion = CTNHChangelog.config.modpackVersion + " " + CTNHChangelog.config.modpackName;
-        StringBuilder info = new StringBuilder(displayVersion);
+        // 1. 读取配置中的整合包名称和版本号
+        String displayName = CTNHChangelog.config.modpackName;
+        String text = CTNHChangelog.config.modpackVersion + " " + displayName;
 
+        // 2. 拼接更新状态提示
+        StringBuilder info = new StringBuilder(text);
         if (VersionCheckService.isCheckDone()) {
             if (VersionCheckService.hasUpdate()) {
-                String updateLabel = Text.translatable("ctnhchangelog.update_found").getString();
-                info.append(" §6(").append(updateLabel).append(VersionCheckService.getLatestChangelogVersion()).append("!)");
-
-                if (this.ctnhChangelogButton != null) {
-                    boolean blink = (System.currentTimeMillis() / 500 & 1) == 1;
-                    if (blink) {
-                        context.drawTextWithShadow(this.textRenderer, "!",
-                                this.ctnhChangelogButton.getX() + this.ctnhChangelogButton.getWidth() - 12,
-                                this.ctnhChangelogButton.getY() + 6, 0xFFFF5555);
-                    }
-                }
-            } else {
-                info.append(" §a(").append(Text.translatable("ctnhchangelog.is_latest").getString()).append(")");
+                info.append(" §6(有更新!)");
             }
-        } else {
-            info.append(" §7(").append(Text.translatable("ctnhchangelog.checking").getString()).append(")");
         }
 
-        String text = info.toString();
-        int textWidth = this.textRenderer.getWidth(text);
+        String finalString = info.toString();
+        int textWidth = this.textRenderer.getWidth(finalString);
+
+        // 3. 计算坐标 (x=2 为左边距，y 根据配置偏移量上移)
         int x = 2;
-        int y = this.height - 11;
+        int y = this.height - CTNHChangelog.config.versionYOffset;
 
+        // 4. 鼠标悬停逻辑与颜色设置
         boolean isHovered = mouseX >= x && mouseX <= x + textWidth && mouseY >= y && mouseY <= y + 9;
-        int color = isHovered ? 0xFFFFFFFF : 0xFFAAAAAA;
 
-        context.drawTextWithShadow(this.textRenderer, text, x, y, color);
+        // 修改点：平时使用 0xFFFFFFFF (纯白)，悬停时使用 0xFFFFFF55 (淡黄)
+        int color = isHovered ? 0xFFFFFF55 : 0xFFFFFFFF;
+
+        // 5. 渲染文字
+        context.drawTextWithShadow(this.textRenderer, finalString, x, y, color);
     }
 }
